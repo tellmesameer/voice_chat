@@ -113,32 +113,7 @@ async def list_documents(user_id: str, db: Session = Depends(get_db)):
         ]
     }
 
-@router.get("/pinecone-stats")
-async def get_pinecone_stats():
-    """Get statistics about the Pinecone index."""
-    logger.info("Getting Pinecone index statistics")
-    
-    try:
-        # Import here to avoid circular imports
-        from pinecone import Pinecone
-        from config import settings
-        
-        pc = Pinecone(api_key=settings.pinecone_api_key)
-        index = pc.Index(settings.pinecone_index_name)
-        
-        stats = index.describe_index_stats()
-        logger.info(f"Pinecone stats: {stats}")
-        
-        return {
-            "status": "success",
-            "stats": stats
-        }
-    except Exception as e:
-        logger.error(f"Error getting Pinecone stats: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+
 
 @router.get("/test-embedding")
 async def test_embedding():
