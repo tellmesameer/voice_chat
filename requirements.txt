@@ -1,0 +1,11 @@
+fastapi
+openai
+pdfplumber
+pinecone-client
+psycopg2-binary
+pydantic
+python-dotenv
+python-multipart
+sqlalchemy
+uvicorn
+alembic
