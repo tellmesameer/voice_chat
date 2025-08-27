@@ -49,6 +49,9 @@ async def upload_voice(
         transcription = transcribe_audio(file_path)
     except Exception as e:
         print(f"Error transcribing audio: {e}")
+        # Return a more specific error message
+        if "401" in str(e):
+            raise HTTPException(status_code=500, detail="Authentication error with speech-to-text service")
         raise HTTPException(status_code=500, detail="Error transcribing audio")
     
     # Get or create user

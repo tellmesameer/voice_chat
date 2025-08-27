@@ -10,14 +10,14 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "your-pinecone-api-key")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "us-west1-gcp")
 PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "voice-chat-index")
 # LLM settings
-LLM_API_KEY = os.getenv("OPENAI_API_KEY", "your-openai-api-key")
+LLM_API_KEY = os.getenv("DEEPINFRA_API_TOKEN", "your-openai-api-key")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
+# STT settings (Voxtral)
+STT_API_KEY = os.getenv("DEEPINFRA_API_TOKEN", "your-stt-api-key")
 # Application settings
 APP_NAME = "SmartFlow Voice Chat"
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+DEBUG = True
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
-
-
 class Settings:
     pinecone_api_key: str = PINECONE_API_KEY
     pinecone_environment: str = PINECONE_ENVIRONMENT
@@ -26,6 +26,7 @@ class Settings:
     BASE_URL: str = BASE_URL
     llm_api_key: str = LLM_API_KEY
     llm_model: str = LLM_MODEL
+    stt_api_key: str = STT_API_KEY
     app_name: str = APP_NAME
     debug: bool = DEBUG 
     assets_dir: str = ASSETS_DIR
