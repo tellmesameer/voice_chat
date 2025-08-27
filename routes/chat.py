@@ -35,6 +35,7 @@ async def send_message(request: ChatRequest, db: Session = Depends(get_db)):
     )
     db.add(chat_entry)
     db.commit()
+    db.refresh(chat_entry)
     
     return ChatResponse(
         response=response_text,
