@@ -13,6 +13,7 @@ from pinecone import Pinecone
 from datetime import datetime
 from db.database import SessionLocal, Document
 from sqlalchemy.orm import Session
+
 # Initialize Pinecone
 pc = Pinecone(api_key=settings.pinecone_api_key)
 index = pc.Index(settings.pinecone_index_name)
@@ -23,6 +24,7 @@ openai = OpenAI(
     api_key=settings.llm_api_key,
     base_url=BASE_URL,
 )
+
 def get_embedding(text: str) -> list:
     """
     Generate an embedding for the given text using the llama-text-embed-v2 model.
@@ -39,24 +41,26 @@ def get_embedding(text: str) -> list:
         print(f"Error generating embedding: {e}")
         # Return a zero vector as fallback
         return [0.0] * 1024
-def retrieve_context(query: str, top_k: int = 3) -> str:
+
+def retrieve_context(query: str, user_id: int, top_k: int = 3) -> str:
     """
-    Retrieve relevant context from Pinecone based on the query.
+    Retrieve relevant context from Pinecone based on the query and user_id.
     """
     # Generate embedding for the query
     query_embedding = get_embedding(query)
     
-    # Query Pinecone
+    # Query Pinecone with metadata filter for user_id
     try:
         results = index.query(
             vector=query_embedding,
             top_k=top_k,
-            include_metadata=True
+            include_metadata=True,
+            filter={"user_id": {"$eq": user_id}}  # Filter by user_id
         )
         
         # Extract the text from the metadata
         context_parts = []
-        for match in getattr(results, 'matches', []):
+        for match in results.get('matches', []):
             if 'metadata' in match and 'text' in match['metadata']:
                 context_parts.append(match['metadata']['text'])
         
@@ -64,7 +68,8 @@ def retrieve_context(query: str, top_k: int = 3) -> str:
     except Exception as e:
         print(f"Error retrieving context from Pinecone: {e}")
         return "Error retrieving context."
-def index_document(file_path: str, document_id: int, db: Session) -> None:
+
+def index_document(file_path: str, document_id: int, user_id: int, db: Session) -> None:
     """
     Parse a PDF document, generate embeddings for each page, and store in Pinecone.
     """
@@ -89,6 +94,7 @@ def index_document(file_path: str, document_id: int, db: Session) -> None:
                 'values': embedding,
                 'metadata': {
                     'document_id': document_id,
+                    'user_id': user_id,  # Add user_id to metadata
                     'chunk_index': i,
                     'text': chunk
                 }
@@ -107,3 +113,4 @@ def index_document(file_path: str, document_id: int, db: Session) -> None:
             
     except Exception as e:
         print(f"Error indexing document {file_path}: {e}")
+

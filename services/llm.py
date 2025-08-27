@@ -25,7 +25,7 @@ def generate_response(user_message: str, context: str) -> str:
         chat_completion = openai.chat.completions.create(
             model="openai/gpt-oss-120b",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Use the provided context to answer the user's question."},
+                {"role": "system", "content": "You are a helpful assistant. Use the provided context to answer the user's question. Do not include emojis in your response."},
                 {"role": "user", "content": prompt}
             ],
         )

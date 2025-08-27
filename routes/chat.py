@@ -62,3 +62,36 @@ async def get_history(user_id: str, db: Session = Depends(get_db)):
             for chat in chats
         ]
     )
+
+
+@router.post("/send", response_model=ChatResponse)
+async def send_message(request: ChatRequest, db: Session = Depends(get_db)):
+    # Get or create user
+    user = db.query(User).filter(User.user_id == request.user_id).first()
+    if not user:
+        user = User(user_id=request.user_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    
+    # Retrieve context from Pinecone for this user
+    context = retrieve_context(request.message, user.id)  # Pass user.id
+    
+    # Generate LLM response
+    response_text = generate_response(request.message, context)
+    
+    # Store chat in database
+    chat_entry = Chat(
+        user_id=user.id,
+        message=request.message,
+        response=response_text,
+        timestamp=datetime.utcnow()
+    )
+    db.add(chat_entry)
+    db.commit()
+    db.refresh(chat_entry)
+    
+    return ChatResponse(
+        response=response_text,
+        timestamp=chat_entry.timestamp
+    )

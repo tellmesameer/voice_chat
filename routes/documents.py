@@ -1,8 +1,7 @@
 # routes/documents.py
-
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, Form
 from models.schemas import DocumentUpload
-from db.database import get_db, Document, SessionLocal
+from db.database import get_db, Document, SessionLocal, User
 from services.pinecone_service import index_document
 import os
 import hashlib
@@ -14,7 +13,8 @@ router = APIRouter()
 @router.post("/upload", response_model=DocumentUpload)
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...), 
+    file: UploadFile = File(...), # Dont chagne the order of parameters
+    user_id: str = Form(...),  # Add user_id parameter
     db: Session = Depends(get_db)
 ):
     # Check if file is None
@@ -24,12 +24,20 @@ async def upload_document(
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
+    # Get user
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
     # Calculate file hash to prevent duplicates
     file_content = await file.read()
     file_hash = hashlib.sha256(file_content).hexdigest()
     
-    # Check if document already exists
-    existing_doc = db.query(Document).filter(Document.content_hash == file_hash).first()
+    # Check if document already exists for this user
+    existing_doc = db.query(Document).filter(
+        Document.content_hash == file_hash,
+        Document.user_id == user.id
+    ).first()
     if existing_doc:
         return DocumentUpload(
             filename=existing_doc.filename,
@@ -43,11 +51,12 @@ async def upload_document(
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
     
-    # Create document record
+    # Create document record with user_id
     document = Document(
         filename=file.filename,
         file_path=file_path,
-        content_hash=file_hash
+        content_hash=file_hash,
+        user_id=user.id
     )
     db.add(document)
     db.commit()
@@ -57,7 +66,7 @@ async def upload_document(
     new_db = SessionLocal()
     
     # Index document in background
-    background_tasks.add_task(index_document, file_path, document.id, new_db)
+    background_tasks.add_task(index_document, file_path, document.id, user.id, new_db)
     
     return DocumentUpload(
         filename=file.filename,

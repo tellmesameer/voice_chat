@@ -37,6 +37,7 @@ class Chat(Base):
     # Relationships
     user = relationship("User", back_populates="chats")
 
+
 class Document(Base):
     __tablename__ = "documents"
     
@@ -47,6 +48,11 @@ class Document(Base):
     indexed = Column(Boolean, default=False)
     indexed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Add user_id foreign key
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Relationship with User
+    user = relationship("User", backref="documents")
 
 def init_db():
     """Create all tables in the database"""

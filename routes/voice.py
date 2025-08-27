@@ -7,6 +7,7 @@ from db.database import get_db, User, Chat
 from services.stt import transcribe_audio
 from services.llm import generate_response
 from services.pinecone_service import retrieve_context
+from services.tts import generate_speech
 from datetime import datetime
 from config import settings
 import os
@@ -18,10 +19,12 @@ router = APIRouter()
 async def upload_voice(
     file: UploadFile = File(...),
     user_id: str = Form(...),
+    generate_audio: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     """
     Upload audio file, transcribe it, and get an LLM response.
+    Optionally generate audio response.
     """
     # Check if file is None
     if file.filename is None:
@@ -62,8 +65,8 @@ async def upload_voice(
         db.commit()
         db.refresh(user)
     
-    # Retrieve context from Pinecone
-    context = retrieve_context(transcription)
+    # Retrieve context from Pinecone for this user
+    context = retrieve_context(transcription, user.id)  # Pass user.id
     
     # Generate LLM response
     response_text = generate_response(transcription, context)
@@ -78,6 +81,17 @@ async def upload_voice(
     db.add(chat_entry)
     db.commit()
     db.refresh(chat_entry)
+    
+    # Generate audio response if requested
+    audio_response_path = None
+    if generate_audio:
+        try:
+            # Generate unique filename for audio response
+            response_filename = f"{uuid.uuid4()}.mp3"
+            audio_response_path = os.path.join(audio_dir, response_filename)
+            generate_speech(response_text, audio_response_path)
+        except Exception as e:
+            print(f"Error generating audio response: {e}")
     
     return ChatResponse(
         response=response_text,

@@ -16,8 +16,9 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
 STT_API_KEY = os.getenv("DEEPINFRA_API_TOKEN", "your-stt-api-key")
 # Application settings
 APP_NAME = "SmartFlow Voice Chat"
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+
 class Settings:
     pinecone_api_key: str = PINECONE_API_KEY
     pinecone_environment: str = PINECONE_ENVIRONMENT
@@ -30,4 +31,5 @@ class Settings:
     app_name: str = APP_NAME
     debug: bool = DEBUG 
     assets_dir: str = ASSETS_DIR
+
 settings = Settings()
