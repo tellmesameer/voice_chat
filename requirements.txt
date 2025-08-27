@@ -1,11 +1,13 @@
 fastapi
 openai
 pdfplumber
+pinecone
 pinecone-client
 psycopg2-binary
 pydantic
 python-dotenv
 python-multipart
 sqlalchemy
+numpy
 uvicorn
 alembic

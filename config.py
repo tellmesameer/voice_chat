@@ -5,7 +5,7 @@ load_dotenv()
 
 # Database settings
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/smartflow")
-
+BASE_URL = "https://api.deepinfra.com/v1/openai"
 # Pinecone settings
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "your-pinecone-api-key")
 PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT", "us-west1-gcp")
@@ -24,6 +24,7 @@ class Settings:
     pinecone_environment: str = PINECONE_ENVIRONMENT
     pinecone_index_name: str = PINECONE_INDEX_NAME
     DATABASE_URL: str = DATABASE_URL
+    BASE_URL: str = BASE_URL
     llm_api_key: str = LLM_API_KEY
     llm_model: str = LLM_MODEL
     app_name: str = APP_NAME

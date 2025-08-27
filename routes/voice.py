@@ -1,13 +1,11 @@
 # routes/voice.py
 
 from openai import OpenAI
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from config import settings
 
 
-DEEINFRA_API_TOKEN = os.getenv("voxtral_api_key")
+DEEINFRA_API_TOKEN=settings.llm_api_key
+
 BASE_URL = "https://api.deepinfra.com/v1/openai"
 # Make sure to set your DEEPINFRA_API_TOKEN environment variable
 
