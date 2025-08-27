@@ -1,8 +1,7 @@
 # models/schemas.py
 
-
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class ChatMessage(BaseModel):
@@ -23,3 +22,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     timestamp: datetime
+
+class ChatHistoryResponse(BaseModel):
+    user_id: str
+    messages: List[Dict[str, Any]]
