@@ -7,15 +7,15 @@ import os
 import hashlib
 from sqlalchemy.orm import Session
 from config import settings
-from logger_config import logger  # Import the logger
+from logger_config import logger
 
 router = APIRouter()
 
 @router.post("/upload", response_model=DocumentUpload)
 async def upload_document(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...), # Dont chagne the order of parameters
-    user_id: str = Form(...),  # Add user_id parameter
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
     db: Session = Depends(get_db)
 ):
     logger.info(f"Document upload requested by user {user_id}")
@@ -85,3 +85,107 @@ async def upload_document(
         filename=file.filename,
         status="indexing"
     )
+
+@router.get("/list/{user_id}")
+async def list_documents(user_id: str, db: Session = Depends(get_db)):
+    """List all documents for a specific user."""
+    logger.info(f"Listing documents for user {user_id}")
+    
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        logger.warning(f"User not found: {user_id}")
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    documents = db.query(Document).filter(Document.user_id == user.id).all()
+    logger.info(f"Found {len(documents)} documents for user {user_id}")
+    
+    return {
+        "user_id": user_id,
+        "documents": [
+            {
+                "id": doc.id,
+                "filename": doc.filename,
+                "indexed": doc.indexed,
+                "indexed_at": doc.indexed_at,
+                "created_at": doc.created_at
+            }
+            for doc in documents
+        ]
+    }
+
+@router.get("/pinecone-stats")
+async def get_pinecone_stats():
+    """Get statistics about the Pinecone index."""
+    logger.info("Getting Pinecone index statistics")
+    
+    try:
+        # Import here to avoid circular imports
+        from pinecone import Pinecone
+        from config import settings
+        
+        pc = Pinecone(api_key=settings.pinecone_api_key)
+        index = pc.Index(settings.pinecone_index_name)
+        
+        stats = index.describe_index_stats()
+        logger.info(f"Pinecone stats: {stats}")
+        
+        return {
+            "status": "success",
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting Pinecone stats: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+@router.get("/test-embedding")
+async def test_embedding():
+    """Test embedding generation with a sample text."""
+    logger.info("Testing embedding generation")
+    
+    try:
+        # Import here to avoid circular imports
+        from services.pinecone_service import get_embedding
+        
+        sample_text = "This is a test text to check if embedding generation works correctly."
+        embedding = get_embedding(sample_text)
+        
+        logger.info(f"Generated embedding of length {len(embedding)}")
+        
+        return {
+            "status": "success",
+            "text": sample_text,
+            "embedding_length": len(embedding),
+            "first_5_values": embedding[:5]
+        }
+    except Exception as e:
+        logger.error(f"Error testing embedding generation: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+    
+
+@router.get("/pinecone-stats")
+async def get_pinecone_stats():
+    """Get statistics about the Pinecone index."""
+    logger.info("Getting Pinecone index statistics")
+    
+    try:
+        # Import here to avoid circular imports
+        from services.pinecone_client import describe_index_stats
+        
+        stats = describe_index_stats()
+        
+        return {
+            "status": "success",
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting Pinecone stats: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }

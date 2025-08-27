@@ -6,7 +6,7 @@ from db.database import get_db, User, Chat
 from services.llm import generate_response
 from services.pinecone_service import retrieve_context
 from datetime import datetime
-from logger_config import logger  # Import the logger
+from logger_config import logger
 
 router = APIRouter()
 

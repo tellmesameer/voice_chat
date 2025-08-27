@@ -13,7 +13,7 @@ from pinecone import Pinecone
 from datetime import datetime
 from db.database import SessionLocal, Document
 from sqlalchemy.orm import Session
-from logger_config import logger  # Import the logger
+from logger_config import logger
 
 # Initialize Pinecone
 pc = Pinecone(api_key=settings.pinecone_api_key)
@@ -99,12 +99,18 @@ def index_document(file_path: str, document_id: int, user_id: int, db: Session) 
                 text = page.extract_text()
                 if text:
                     text_chunks.append(text)
+                    logger.debug(f"Extracted {len(text)} characters from page {i+1}")
         
         logger.info(f"Extracted {len(text_chunks)} text chunks from PDF")
+        
+        if not text_chunks:
+            logger.warning(f"No text extracted from document {file_path}")
+            return
         
         # Generate embeddings for each chunk and upsert to Pinecone
         vectors = []
         for i, chunk in enumerate(text_chunks):
+            logger.debug(f"Processing chunk {i+1}/{len(text_chunks)} of length {len(chunk)}")
             embedding = get_embedding(chunk)
             vectors.append({
                 'id': f"doc_{document_id}_chunk_{i}",
@@ -120,8 +126,8 @@ def index_document(file_path: str, document_id: int, user_id: int, db: Session) 
         # Upsert to Pinecone
         if vectors:
             logger.info(f"Upserting {len(vectors)} vectors to Pinecone")
-            index.upsert(vectors)
-            logger.info("Successfully upserted vectors to Pinecone")
+            response = index.upsert(vectors)
+            logger.info(f"Pinecone upsert response: {response}")
         else:
             logger.warning("No vectors to upsert to Pinecone")
         
@@ -135,3 +141,8 @@ def index_document(file_path: str, document_id: int, user_id: int, db: Session) 
             
     except Exception as e:
         logger.error(f"Error indexing document {file_path}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+        
