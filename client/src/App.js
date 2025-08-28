@@ -111,7 +111,7 @@ function App() {
       // cleanup on unmount: stop any active websocket stream via the hook
       try { stop(); } catch (e) {}
     };
-  }, []);
+  }, [stop]);
 
   // Retry with the same audio blob
   const handleRetry = async (audioBlob) => {
