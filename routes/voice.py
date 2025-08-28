@@ -110,7 +110,8 @@ async def upload_voice(
             generate_speech(response_text, audio_response_path)
 
             if os.path.exists(audio_response_path):
-                rel_path = os.path.relpath(audio_response_path, settings.assets_dir)
+                # ✅ Fix: Convert backslashes to forward slashes for URLs
+                rel_path = os.path.relpath(audio_response_path, settings.assets_dir).replace("\\", "/")
                 audio_url = f"/static/audio/{urllib.parse.quote(rel_path)}"
                 logger.info(f"Audio response generated: {audio_url}")
             else:
