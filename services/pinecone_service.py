@@ -19,6 +19,7 @@ from logger_config import logger
 pc = Pinecone(api_key=settings.pinecone_api_key)
 index = pc.Index(settings.pinecone_index_name)
 BASE_URL = settings.BASE_URL
+EMBEDDING_MODEL = "intfloat/e5-large-v2"  # or "intfloat/multilingual-e5-large"
 
 # Create an OpenAI client with your deepinfra token and endpoint
 openai = OpenAI(
@@ -33,9 +34,10 @@ def get_embedding(text: str) -> list:
     try:
         logger.info(f"Generating embedding for text of length {len(text)}")
         embeddings = openai.embeddings.create(
-            model="Qwen/Qwen3-Embedding-8B",
             input=text,
-            encoding_format="float"
+            model=EMBEDDING_MODEL,      # or "intfloat/multilingual-e5-large"
+            dimensions=1024,
+            encoding_format="float",
         )
         # Return the actual embedding vector, not the token count
         embedding = embeddings.data[0].embedding
