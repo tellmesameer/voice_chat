@@ -50,11 +50,21 @@ async def upload_voice(
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
     file_path = os.path.join(audio_dir, unique_filename)
 
+    # Save uploaded file
     try:
         contents = await file.read()
+        if len(contents) == 0:
+            raise ValueError("Empty file uploaded")
+
         with open(file_path, "wb") as f:
             f.write(contents)
+            f.flush()
+            os.fsync(f.fileno())  # Critical on Windows
         logger.info(f"Saved audio file to {file_path}")
+
+        # Confirm file is readable
+        if os.path.getsize(file_path) == 0:
+            raise RuntimeError("Saved file is empty")
     except Exception as e:
         logger.error(f"Failed to save uploaded file: {e}")
         raise HTTPException(status_code=500, detail="Failed to save audio file")
