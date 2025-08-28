@@ -8,7 +8,7 @@ openai = OpenAI(
     base_url=settings.BASE_URL,
 )
 
-DEFAULT_LLM_MODEL = getattr(settings, "llm_model", "openai/gpt-oss-120b")
+DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
 
 def generate_response(user_message: str, context: str) -> str:
     """
@@ -27,7 +27,7 @@ def generate_response(user_message: str, context: str) -> str:
                 {"role": "system", "content": "You are a helpful assistant. Use the context to answer concisely."},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=512,
+            max_tokens=None,
         )
 
         # extract text robustly

@@ -12,9 +12,13 @@ from config import APP_NAME, DEBUG
 from db.database import init_db
 from routes import health   # <-- new
 from logger_config import logger  # Import the logger
+from fastapi.staticfiles import StaticFiles
+import os
 
 app = FastAPI(title=APP_NAME, debug=DEBUG)
 
+# After app = FastAPI(...)
+app.mount("/static", StaticFiles(directory="assets"), name="static")
 # Initialize database on startup
 @app.on_event("startup")
 def startup_event():

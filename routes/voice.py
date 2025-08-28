@@ -1,18 +1,19 @@
 # routes/voice.py
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
-from fastapi.responses import JSONResponse
+import os
+import urllib.parse
+import uuid
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
-from models.schemas import ChatRequest, ChatResponse
-from db.database import get_db, User, Chat
-from services.stt import transcribe_audio
+
+from config import settings
+from db.database import Chat, User, get_db
+from logger_config import logger  # Import the logger
+from models.schemas import ChatResponse
 from services.llm import generate_response
 from services.pinecone_service import retrieve_context
-from services.tts import generate_speech
-from datetime import datetime
-from config import settings
-import os
-import uuid
-from logger_config import logger  # Import the logger
+from services.stt import transcribe_audio
 
 router = APIRouter()
 
@@ -103,13 +104,28 @@ async def upload_voice(
             # Generate unique filename for audio response
             response_filename = f"{uuid.uuid4()}.mp3"
             audio_response_path = os.path.join(audio_dir, response_filename)
-            logger.info(f"Generating audio response to {audio_response_path}")
-            generate_speech(response_text, audio_response_path)
-            logger.info("Audio response generated successfully")
+            # In routes/voice.py, modify return statement
+
+            # Replace the final return with:
+            if audio_response_path and os.path.exists(audio_response_path):
+                # Make sure path is relative to static assets
+                rel_path = os.path.relpath(audio_response_path, settings.assets_dir)
+                audio_url = f"/static/audio/{urllib.parse.quote(rel_path)}"
+                return {
+                    "response": response_text,
+                    "timestamp": chat_entry.timestamp.isoformat(),
+                    "audio_url": audio_url
+                }
+
+            return {
+                "response": response_text,
+                "timestamp": chat_entry.timestamp.isoformat()
+            }
         except Exception as e:
             logger.error(f"Error generating audio response: {e}")
-    
-    return ChatResponse(
-        response=response_text,
-        timestamp=chat_entry.timestamp
-    )
+            return {
+                "response": response_text,
+                "timestamp": chat_entry.timestamp.isoformat(),
+                "audio_url": None,
+                "error": "Failed to generate audio response"
+            }
