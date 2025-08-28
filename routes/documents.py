@@ -1,13 +1,17 @@
 # routes/documents.py
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, Form
-from models.schemas import DocumentUpload
-from db.database import get_db, Document, SessionLocal, User
-from services.pinecone_service import index_document
-import os
 import hashlib
+import os
+
+from fastapi import (APIRouter, BackgroundTasks, Depends, File, Form,
+                     HTTPException, UploadFile)
 from sqlalchemy.orm import Session
+
 from config import settings
+from db.database import Document, SessionLocal, User, get_db
 from logger_config import logger
+from models.schemas import DocumentUpload
+from services.pinecone_client import describe_index_stats
+from services.pinecone_service import index_document
 
 router = APIRouter()
 
@@ -150,7 +154,6 @@ async def get_pinecone_stats():
     
     try:
         # Import here to avoid circular imports
-        from services.pinecone_client import describe_index_stats
         
         stats = describe_index_stats()
         

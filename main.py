@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from routes import chat, documents, voice, users
 from config import APP_NAME, DEBUG
 from db.database import init_db
+from routes import health   # <-- new
 from logger_config import logger  # Import the logger
 
 app = FastAPI(title=APP_NAME, debug=DEBUG)
@@ -26,6 +27,8 @@ app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(health.router, prefix="", tags=["health"])  # mounts /health
+
 
 @app.get("/")
 async def root():

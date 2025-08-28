@@ -25,7 +25,10 @@ async def send_message(request: ChatRequest, db: Session = Depends(get_db)):
     
     # Retrieve context from Pinecone for this user
     logger.info(f"Retrieving context for user {user.id}")
-    context = retrieve_context(request.message, user.id)  # Pass user.id
+    context = retrieve_context(request.message, user.id)
+    if context.startswith("Error"):
+        logger.warning("Context retrieval returned an error; continuing with empty context")
+        context = ""
     
     # Generate LLM response
     logger.info("Generating LLM response")

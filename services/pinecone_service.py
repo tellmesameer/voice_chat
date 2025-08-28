@@ -9,17 +9,65 @@
 # Metric = cosine
 from openai import OpenAI
 from config import settings
-from pinecone import Pinecone
 from datetime import datetime
 from db.database import SessionLocal, Document
 from sqlalchemy.orm import Session
 from logger_config import logger
+from pinecone import Pinecone
+import logging
+import os
 
-# Initialize Pinecone
-pc = Pinecone(api_key=settings.pinecone_api_key)
-index = pc.Index(settings.pinecone_index_name)
+logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
 EMBEDDING_MODEL = "intfloat/e5-large-v2"  # or "intfloat/multilingual-e5-large"
+
+# Initialize Pinecone client
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pc.Index(settings.pinecone_index_name)
+
+# Connect to existing index (make sure env var is set)
+INDEX_NAME = settings.pinecone_index_name
+
+if not INDEX_NAME:
+    raise RuntimeError("PINECONE_INDEX_NAME is not set in environment variables")
+
+try:
+    index = pc.Index(INDEX_NAME)
+    logger.info(f"Connected to Pinecone index: {INDEX_NAME}")
+except Exception as e:
+    logger.error(f"Failed to connect to Pinecone index: {e}")
+    index = None
+
+
+def describe_index_stats():
+    """Return Pinecone index stats in JSON-safe form."""
+    if index is None:
+        raise RuntimeError("Pinecone index is not initialized")
+
+    try:
+        stats = index.describe_index_stats()
+
+        # Convert to JSON-serializable
+        def make_serializable(obj):
+            if isinstance(obj, dict):
+                return {k: make_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_serializable(i) for i in obj]
+            elif hasattr(obj, "model_dump"):
+                return make_serializable(obj.model_dump())
+            elif hasattr(obj, "__dict__"):
+                return make_serializable(vars(obj))
+            elif isinstance(obj, (int, float, str, bool)) or obj is None:
+                return obj
+            else:
+                return str(obj)
+
+        return make_serializable(stats)
+
+    except Exception as e:
+        logger.error(f"Error retrieving Pinecone stats: {e}")
+        raise
+
 
 # Create an OpenAI client with your deepinfra token and endpoint
 openai = OpenAI(
@@ -29,60 +77,92 @@ openai = OpenAI(
 
 def get_embedding(text: str) -> list:
     """
-    Generate an embedding for the given text using the llama-text-embed-v2 model.
+    Generate an embedding for the given text using DeepInfra via OpenAI-compatible client.
+    NOTE: Don't pass 'dimensions' — the model determines the vector size.
     """
     try:
-        logger.info(f"Generating embedding for text of length {len(text)}")
+        text = text or ""
+        logger.info("Generating embedding for text of length %d", len(text))
         embeddings = openai.embeddings.create(
             input=text,
-            model=EMBEDDING_MODEL,      # or "intfloat/multilingual-e5-large"
-            dimensions=1024,
+            model=EMBEDDING_MODEL,
             encoding_format="float",
         )
-        # Return the actual embedding vector, not the token count
-        embedding = embeddings.data[0].embedding
-        logger.info(f"Successfully generated embedding of length {len(embedding)}")
-        return embedding
+        # robust extraction: some SDKs return dict or object
+        try:
+            embedding = embeddings.data[0].embedding
+        except Exception:
+            # try alternative shapes
+            if isinstance(embeddings, dict):
+                embedding = embeddings.get("data", [])[0].get("embedding")
+            else:
+                embedding = getattr(embeddings.data[0], "embedding", None)
+
+        if not embedding:
+            raise ValueError("Embedding returned empty from the API")
+
+        logger.info("Successfully generated embedding of length %d", len(embedding))
+        return list(embedding)
     except Exception as e:
-        logger.error(f"Error generating embedding: {e}")
-        # Return a zero vector as fallback
+        logger.exception("Error generating embedding: %s", e)
+        # Return a zero vector fallback matching your index dimension (1024)
         return [0.0] * 1024
+
 
 def retrieve_context(query: str, user_id: int, top_k: int = 3) -> str:
     """
     Retrieve relevant context from Pinecone based on the query and user_id.
+    Handles multiple Pinecone response shapes safely.
     """
-    logger.info(f"Retrieving context for query: '{query}' for user_id: {user_id}")
-    
-    # Generate embedding for the query
+    logger.info("Retrieving context for user_id=%s query_len=%d", user_id, len(query or ""))
     query_embedding = get_embedding(query)
-    
-    # Query Pinecone with metadata filter for user_id
+
     try:
-        logger.info(f"Querying Pinecone with user_id filter: {user_id}")
-        results = index.query(
+        resp = index.query(
             vector=query_embedding,
             top_k=top_k,
             include_metadata=True,
-            filter={"user_id": {"$eq": user_id}}  # Filter by user_id
+            filter={"user_id": {"$eq": user_id}},
         )
-        
-        # Extract the text from the metadata
-        context_parts = []
-        matches = results.get('matches', [])
-        logger.info(f"Found {len(matches)} matches in Pinecone")
-        
-        for match in matches:
-            if 'metadata' in match and 'text' in match['metadata']:
-                context_parts.append(match['metadata']['text'])
-                logger.debug(f"Added context chunk of length {len(match['metadata']['text'])}")
-        
-        context = "\n".join(context_parts) if context_parts else "No relevant context found."
-        logger.info(f"Retrieved context of length {len(context)}")
-        return context
     except Exception as e:
-        logger.error(f"Error retrieving context from Pinecone: {e}")
+        logger.exception("Pinecone query failed: %s", e)
         return "Error retrieving context."
+
+    # Normalize matches
+    matches = []
+    if isinstance(resp, dict):
+        matches = resp.get("matches", []) or resp.get("results", [])
+    else:
+        # object form: try attributes
+        matches = getattr(resp, "matches", None) or getattr(resp, "results", None) or []
+
+    context_parts = []
+    for m in matches:
+        try:
+            # m can be dict or object; unify
+            meta = m.get("metadata") if isinstance(m, dict) else getattr(m, "metadata", None)
+            if not meta:
+                # some SDKs nest metadata differently
+                meta = m.get("meta") if isinstance(m, dict) else getattr(m, "meta", None)
+
+            text_chunk = None
+            if isinstance(meta, dict):
+                text_chunk = meta.get("text") or meta.get("original_text") or meta.get("content")
+            else:
+                text_chunk = getattr(meta, "text", None) if meta else None
+
+            if text_chunk:
+                context_parts.append(text_chunk)
+        except Exception:
+            logger.debug("Failed to parse a match entry: %s", m)
+
+    if not context_parts:
+        return "No relevant context found."
+
+    context = "\n".join(context_parts)
+    logger.info("Retrieved context length=%d", len(context))
+    return context
+
 
 def index_document(file_path: str, document_id: int, user_id: int, db: Session) -> None:
     """
