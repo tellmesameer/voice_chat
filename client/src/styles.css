@@ -80,3 +80,19 @@ h1 {
   color: #666;
   margin-top: 5px;
 }
+
+.retry-btn {
+  background: #e0e0e0;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 8px;
+  opacity: 0.7;
+}
+
+.retry-btn:hover {
+  opacity: 1;
+  background: #ccc;
+}

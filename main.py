@@ -1,11 +1,5 @@
 # main.py
-"""
-curl "https://api.deepinfra.com/v1/openai/audio/transcriptions" `
-  -H "Content-Type: multipart/form-data" `
-  -H "Authorization: Bearer 2QZ3o7qfawRr8ByDM5dkobGKtpbn8zSA" `
-  -F "file=@D:/AI_Project/voice_chat/speech.mp3" `
-  -F "model=mistralai/Voxtral-Small-24B-2507"
-"""
+
 from fastapi import FastAPI
 from routes import chat, documents, voice, users
 from config import APP_NAME, DEBUG
@@ -14,9 +8,19 @@ from routes import health   # <-- new
 from logger_config import logger  # Import the logger
 from fastapi.staticfiles import StaticFiles
 import os
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 app = FastAPI(title=APP_NAME, debug=DEBUG)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # After app = FastAPI(...)
 app.mount("/static", StaticFiles(directory="assets"), name="static")
 # Initialize database on startup
