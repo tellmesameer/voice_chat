@@ -14,6 +14,8 @@ LLM_API_KEY = os.getenv("DEEPINFRA_API_TOKEN", "your-openai-api-key")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
 # STT settings (Voxtral)
 STT_API_KEY = os.getenv("DEEPINFRA_API_TOKEN", "your-stt-api-key")
+# WebSocket auth token (optional). If set, clients must send ?token=<value> or Authorization header.
+WS_AUTH_TOKEN = os.getenv("WS_AUTH_TOKEN", "")
 # Application settings
 APP_NAME = "SmartFlow Voice Chat"
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
@@ -28,6 +30,7 @@ class Settings:
     llm_api_key: str = LLM_API_KEY
     llm_model: str = LLM_MODEL
     stt_api_key: str = STT_API_KEY
+    ws_auth_token: str = WS_AUTH_TOKEN
     app_name: str = APP_NAME
     debug: bool = DEBUG 
     assets_dir: str = ASSETS_DIR

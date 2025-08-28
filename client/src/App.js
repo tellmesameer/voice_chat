@@ -1,5 +1,6 @@
 // src/App.js
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import useWebSocketStream from './hooks/useWebSocketStream';
 import { AudioRecorder, useAudioRecorder } from 'react-audio-voice-recorder';
 import axios from 'axios';
 import './styles.css';
@@ -11,6 +12,31 @@ function App() {
   const [userID, setUserID] = useState('user_001');
   const [messages, setMessages] = useState([]);
   const audioRef = useRef(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  const { start, stop } = useWebSocketStream({
+    backendUrl: BACKEND_URL,
+    userID,
+    onFinalResult: (data) => {
+      const aiReply = data.response || "I couldn't understand that.";
+      const audioURL = data.audio_url || null;
+      setMessages(prev => [
+        ...prev,
+        { type: 'user', text: `🎤 Live voice (user: ${userID})` },
+        { type: 'ai', text: aiReply, audio: audioURL }
+      ]);
+
+      if (audioURL && audioRef.current) {
+        audioRef.current.src = `${BACKEND_URL}${audioURL}`;
+        audioRef.current.play().catch(e => console.error('Play failed:', e));
+      }
+      setIsStreaming(false);
+    },
+    onError: (err, data) => {
+      console.error('WebSocket stream error', err, data);
+      setIsStreaming(false);
+    }
+  });
 
   // Setup recorder
   const recorderControls = useAudioRecorder(
@@ -46,10 +72,10 @@ function App() {
         { type: 'ai', text: aiReply, audio: audioURL }
       ]);
 
-      // Play AI audio if available
+      // Play AI audio if available using hidden audio player
       if (audioURL && audioRef.current) {
         audioRef.current.src = `${BACKEND_URL}${audioURL}`;
-        audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
+        audioRef.current.play().catch(e => console.error("Play failed:", e));
       }
     } catch (err) {
       console.error("❌ API Error:", err);
@@ -60,6 +86,32 @@ function App() {
       ]);
     }
   };
+
+  const startStreaming = async () => {
+    if (isStreaming) return;
+    try {
+      await start();
+      setIsStreaming(true);
+    } catch (e) {
+      console.error('Failed to start streaming', e);
+    }
+  };
+
+  const stopStreaming = () => {
+    if (!isStreaming) return;
+    try {
+      stop();
+    } catch (e) {
+      console.error('Error stopping stream', e);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      // cleanup on unmount: stop any active websocket stream via the hook
+      try { stop(); } catch (e) {}
+    };
+  }, []);
 
   // Retry with the same audio blob
   const handleRetry = async (audioBlob) => {
@@ -85,7 +137,7 @@ function App() {
 
       if (audioURL && audioRef.current) {
         audioRef.current.src = `${BACKEND_URL}${audioURL}`;
-        audioRef.current.play().catch(e => console.error("Audio playback failed:", e));
+        audioRef.current.play().catch(e => console.error("Play failed:", e));
       }
     } catch (err) {
       console.error("❌ Retry failed:", err);
@@ -147,6 +199,13 @@ function App() {
 
       {/* Audio Recorder */}
       <div className="mic-section">
+        <div style={{ marginBottom: 8 }}>
+          {!isStreaming ? (
+            <button onClick={startStreaming} className="record-button">Start Live Stream</button>
+          ) : (
+            <button onClick={stopStreaming} className="record-button" style={{ background: '#c33' }}>Stop Live Stream</button>
+          )}
+        </div>
         <AudioRecorder
           onRecordingComplete={handleRecordingComplete}
           recorderControls={recorderControls}
