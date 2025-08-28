@@ -164,7 +164,8 @@ async def websocket_stream(websocket: WebSocket):
             generate_speech(response_text, audio_response_path)
             if os.path.exists(audio_response_path):
                 rel_path = os.path.relpath(audio_response_path, settings.assets_dir).replace("\\", "/")
-                audio_url = f"/static/audio/{urllib.parse.quote(rel_path)}"
+                # rel_path already contains the 'audio/...' segment, so don't duplicate it
+                audio_url = f"/static/{urllib.parse.quote(rel_path)}"
         except Exception as e:
             logger.error(f"TTS generation failed for websocket stream: {e}")
 

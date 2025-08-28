@@ -117,7 +117,8 @@ async def upload_voice(
 
             if os.path.exists(audio_response_path):
                 rel_path = os.path.relpath(audio_response_path, settings.assets_dir).replace("\\", "/")
-                audio_url = f"/static/audio/{urllib.parse.quote(rel_path)}"
+                # rel_path already contains the 'audio/...' prefix under assets
+                audio_url = f"/static/{urllib.parse.quote(rel_path)}"
                 logger.info(f"Audio response generated: {audio_url}")
             else:
                 logger.warning("Audio file was expected but not found")

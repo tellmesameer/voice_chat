@@ -2,15 +2,47 @@
 
 ---
 
+## **Quick Start (Setup & Usage)**
+
+### **Backend (FastAPI)**
+1. Install Python dependencies:
+   ```sh
+   pip install -r requirements.txt
+   ```
+2. Ensure `ffmpeg` is installed and available in your PATH (required for audio conversion).
+3. Start the backend server:
+   ```sh
+   py -m uvicorn main:app --reload
+   ```
+   Or use your preferred entrypoint (e.g., `py run.py`).
+
+### **Frontend (React)**
+1. Go to the `client` folder:
+   ```sh
+   cd client
+   npm install
+   npm start
+   ```
+2. The React app runs on [http://localhost:3000](http://localhost:3000) by default.
+
+### **Configuration**
+- Set environment variables in `.env` (see `config.py` for options):
+  - `WS_AUTH_TOKEN` (optional, for WebSocket authentication)
+  - Database, Pinecone, LLM, and API keys as needed
+
+---
+
 ## **1. State (System Overview / Current State)**
 
-* Users interact via **voice**.
-* Voice is **transcribed to text** using **Voxtral 24b**.
-* Text input is sent to a **single LLM model**.
-* LLM response is augmented by **document context** stored in PDFs.
+* Users interact via **voice** and **text** (React frontend).
+* Voice is **transcribed to text** using **Voxtral 24b** (DeepInfra/OpenAI-compatible API).
+* Real-time voice streaming via **WebSocket** (browser → FastAPI backend).
+* Text and voice input sent to a **single LLM model**.
+* LLM response is augmented by **document context** stored in PDFs (indexed in Pinecone).
 * **Chat history** is stored in **PostgreSQL**.
 * **Documents** are **automatically indexed** into **Pinecone** vector DB.
 * **Assets** (audio, PDFs) are stored locally in `assets/`.
+* Modularized backend (services/streaming.py, services/stt.py, etc.) and frontend (React hooks for streaming).
 
 ---
 
@@ -24,6 +56,8 @@
 | `db`        | PostgreSQL connection and chat history queries                    |
 | `assets`    | Storage for uploaded audio and documents                          |
 | `config.py` | Centralized configuration for DB, Pinecone, LLM, Voxtral          |
+| `client/`   | React frontend (audio recording, streaming, chat UI)              |
+| `client/src/hooks/useWebSocketStream.js` | React hook for real-time voice streaming |
 
 ---
 
