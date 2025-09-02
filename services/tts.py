@@ -12,7 +12,7 @@ tts_client = OpenAI(
 
 MODEL = "hexgrad/Kokoro-82M"
 AI_VOICE = "af_bella"
-RESPONSE_FORMAT = "mp3"
+RESPONSE_FORMAT = "wav"
 
 def generate_speech(user_text: str, output_path: str) -> str:
     """Generate speech from text using DeepInfra's API and save to output_path."""

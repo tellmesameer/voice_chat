@@ -114,9 +114,13 @@ def retrieve_context(query: str, user_id: int, top_k: int = 3) -> str:
     Retrieve relevant context from Pinecone based on the query and user_id.
     Handles multiple Pinecone response shapes safely.
     """
+    print("Getting user_id in retrieve function--> ", user_id)
     logger.info("Retrieving context for user_id=%s query_len=%d", user_id, len(query or ""))
+    print("query--> ", query)
     query_embedding = get_embedding(query)
-
+    print("query_embedding---> ", query_embedding)
+    # user_id = 1212
+    print("user_id---> ", user_id)
     try:
         resp = index.query(
             vector=query_embedding,
@@ -124,8 +128,12 @@ def retrieve_context(query: str, user_id: int, top_k: int = 3) -> str:
             include_metadata=True,
             filter={"user_id": {"$eq": user_id}},
         )
+        print()
+        print("getting resp in retrieve function---> ", resp)
+        print()
     except Exception as e:
         logger.exception("Pinecone query failed: %s", e)
+        print("resp failed----")
         return "Error retrieving context."
 
     # Normalize matches
