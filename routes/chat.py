@@ -5,10 +5,28 @@ from models.schemas import ChatRequest, ChatResponse, ChatHistoryResponse
 from db.database import get_db, User, Chat
 from services.llm import generate_response
 from services.pinecone_service import retrieve_context
+# from services.pinecone_service import store_user_context
 from datetime import datetime
 from logger_config import logger
 
 router = APIRouter()
+
+# # Phase 1: Store user context in Pinecone
+# from pydantic import BaseModel
+
+# class StoreContextRequest(BaseModel):
+#     user_id: int
+#     context: str
+
+# @router.post("/store_context")
+# async def store_context(request: StoreContextRequest):
+#     """Store user context in Pinecone for a given user_id."""
+#     try:
+#         store_user_context(request.user_id, request.context)
+#         return {"message": "Context stored successfully."}
+#     except Exception as e:
+#         logger.error(f"Error storing context: {e}")
+#         return {"error": str(e)}
 
 @router.post("/send", response_model=ChatResponse)
 async def send_message(request: ChatRequest, db: Session = Depends(get_db)):
@@ -24,14 +42,20 @@ async def send_message(request: ChatRequest, db: Session = Depends(get_db)):
         db.refresh(user)
     
     # Retrieve context from Pinecone for this user
-    logger.info(f"Retrieving context for user {user.id}")
+    print("getting user in chat.py---__> ", user)
+    logger.info(f"Retrieving context for user in chat.py---> {user.id}")
+    print("request.message---> ", request.message)
+
     context = retrieve_context(request.message, user.id)
+    print("---------------------------------------------")
+    print("context:: ", context)
+    print("---------------------------------------------")
     if context.startswith("Error"):
         logger.warning("Context retrieval returned an error; continuing with empty context")
         context = ""
     
     # Generate LLM response
-    logger.info("Generating LLM response")
+    logger.info("Generating LLM response - Before chat function execution in - chat.py")
     response_text = generate_response(request.message, context)
     
     # Store chat in database

@@ -15,7 +15,7 @@ def generate_response(user_message: str, context: str) -> str:
     Generate a response from the LLM based on the user message and context.
     Defensive parsing for multiple possible SDK response shapes.
     """
-    logger.info("Generating LLM response")
+    logger.info("Generating LLM response - After function execution - llm.py")
     try:
         prompt = f"Context:\n{context}\n\nUser: {user_message}\nAssistant:"
         logger.debug("Prepared prompt to LLM (len=%d)", len(prompt))

@@ -80,17 +80,19 @@ async def upload_voice(
         db.refresh(user)
 
     # Retrieve context using numeric user.id
-    logger.info(f"Retrieving context for user {user.user_id} (db id={user.id})")
+    logger.info(f"Retrieving context for user in voice.py--> {user.user_id} (db id={user.id})")
     # Safely get numeric DB id (avoid passing SQLAlchemy Column objects)
-    uid = getattr(user, 'id', 0) or 0
+    # uid = getattr(user, 'id', 0) or 0
+    uid = user.user_id
     try:
         uid = int(uid)
     except Exception:
         uid = 0
     context = retrieve_context(transcription, uid)
+    print("Final output context in voice.py --------> ", context)
 
     # Generate LLM response
-    logger.info("Generating LLM response")
+    logger.info("Generating LLM response  - before function execution in - voice.py")
     response_text = generate_response(transcription, context)
 
     # Store chat in DB
@@ -109,7 +111,7 @@ async def upload_voice(
     audio_url = None
     if generate_audio:
         try:
-            response_filename = f"{uuid.uuid4()}.mp3"
+            response_filename = f"{uuid.uuid4()}.wav"
             audio_response_path = os.path.join(audio_dir, response_filename)
             logger.info(f"Generating audio response to {audio_response_path}")
 
