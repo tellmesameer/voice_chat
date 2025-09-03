@@ -2,7 +2,7 @@
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from sqlalchemy.sql import func
 from sqlalchemy import create_engine
 
@@ -64,3 +64,18 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_or_create_user_by_external_id(db: Session, external_user_id: str) -> int:
+    """Return the DB primary key for a given external/frontend user identifier.
+
+    If the user does not exist, create it. This centralizes the mapping so
+    all services use the DB PK (int) as the canonical user id for Pinecone metadata.
+    """
+    user = db.query(User).filter(User.user_id == external_user_id).first()
+    if not user:
+        user = User(user_id=external_user_id)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user.id

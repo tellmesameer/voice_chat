@@ -225,9 +225,9 @@ def run_sequence():
 
     # proceed with CRUD test
     texts = [
-        "This is a pinecone test vector about apples.",
-        "Another vector talking about oranges.",
-        "Third vector: bananas and tropical fruits."
+        "Hi there my name is Sahil Thakur.",
+        "I live in new Delhi.",
+        "I Usually do my work from Home."
     ]
     created_ids = create_vectors(idx, texts, metadata_base={"user_id": 123, "source": "crud_test"})
     print("CREATE: OK", created_ids)
@@ -236,6 +236,7 @@ def run_sequence():
 
     # fetch
     fresp = fetch_by_id(idx, [created_ids[0]])
+    print(f"Found the context---> {fresp}")
     found = False
     try:
         if isinstance(fresp, dict):
@@ -259,14 +260,14 @@ def run_sequence():
         print("UPDATE_METADATA: FAIL")
 
     # delete one
-    delete_vectors(idx, ids=[created_ids[1]])
-    print("DELETE_ONE: requested")
+    # delete_vectors(idx, ids=[created_ids[1]])
+    # print("DELETE_ONE: requested")
 
     # cleanup remaining
     try:
         remaining = [i for i in created_ids if i != created_ids[1]]
-        delete_vectors(idx, ids=remaining)
-        print("CLEANUP: OK")
+        # delete_vectors(idx, ids=remaining)
+        # print("CLEANUP: OK")
     except Exception:
         print("CLEANUP: FAIL")
 

@@ -16,6 +16,7 @@ from logger_config import logger
 from pinecone import Pinecone
 import logging
 import os
+import uuid
 
 logger = logging.getLogger(__name__)
 BASE_URL = settings.BASE_URL
@@ -118,8 +119,7 @@ def retrieve_context(query: str, user_id: int, top_k: int = 3) -> str:
     logger.info("Retrieving context for user_id=%s query_len=%d", user_id, len(query or ""))
     print("query--> ", query)
     query_embedding = get_embedding(query)
-    print("query_embedding---> ", query_embedding)
-    # user_id = 1212
+    # print("query_embedding in pinecone_service.py---> ", query_embedding)
     print("user_id---> ", user_id)
     try:
         resp = index.query(
@@ -233,6 +233,59 @@ def index_document(file_path: str, document_id: int, user_id: int, db: Session) 
         logger.error(f"Error indexing document {file_path}: {e}")
         import traceback
         logger.error(traceback.format_exc())
+
+
+def index_transcript(user_id: int, transcript: str, chat_id: int = None):
+    """
+    Break a transcript into small chunks, generate embeddings, and upsert to Pinecone.
+
+    Each vector includes metadata: user_id (DB primary key), chat_id (optional),
+    chunk_index, text, and timestamp. Vector ids are unique (include uuid) so
+    multiple vectors can exist per user.
+    """
+    try:
+        if not transcript:
+            logger.info("index_transcript called with empty transcript; skipping")
+            return
+
+        # simple chunking by sentences / size; keep chunks <= ~2000 chars
+        chunks = []
+        cur = []
+        for part in transcript.replace('\r', '\n').split('\n'):
+            part = part.strip()
+            if not part:
+                continue
+            if sum(len(p) for p in cur) + len(part) + 1 > 1800:
+                chunks.append(' '.join(cur))
+                cur = [part]
+            else:
+                cur.append(part)
+        if cur:
+            chunks.append(' '.join(cur))
+
+        vectors = []
+        for i, chunk in enumerate(chunks):
+            emb = get_embedding(chunk)
+            vid = f"chat_{chat_id or 'anon'}_chunk_{i}_{uuid.uuid4().hex[:8]}"
+            vectors.append({
+                'id': vid,
+                'values': emb,
+                'metadata': {
+                    'user_id': int(user_id),
+                    'chat_id': int(chat_id) if chat_id is not None else None,
+                    'chunk_index': i,
+                    'text': chunk,
+                    'created_at': datetime.utcnow().isoformat()
+                }
+            })
+
+        if vectors:
+            logger.info(f"Upserting {len(vectors)} transcript vectors for user {user_id}")
+            resp = index.upsert(vectors)
+            logger.info(f"index_transcript upsert response: {resp}")
+    except Exception as e:
+        logger.exception("Failed to index transcript: %s", e)
+        raise
 
 
         

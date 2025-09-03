@@ -12,8 +12,10 @@ from config import settings
 from logger_config import logger
 from services.stt import transcribe_audio
 from services.tts import generate_speech
-from services.pinecone_service import retrieve_context
+from services.pinecone_service import retrieve_context, index_transcript
 from services.llm import generate_response
+from db.database import SessionLocal, get_or_create_user_by_external_id, Chat
+from datetime import datetime
 
 # Simple in-memory concurrency map: user_id -> active_stream_count
 active_streams: Dict[int, int] = {}
@@ -38,12 +40,16 @@ async def websocket_stream(websocket: WebSocket):
             await websocket.close(code=4401)
             logger.warning("WebSocket rejected due to missing/invalid token")
             return
+    # Resolve external user id to DB id using a short-lived session
     try:
-        user_id = int(user_id_param)
+        external_user_id = user_id_param
+        with SessionLocal() as s:
+            db_user_id = get_or_create_user_by_external_id(s, external_user_id)
     except Exception:
-        user_id = 0
+        db_user_id = 0
 
-    logger.info(f"WebSocket stream connected for user: {user_id}")
+    user_id = int(db_user_id)
+    logger.info(f"WebSocket stream connected for external_user={user_id_param} db_user={user_id}")
 
     # concurrency guard
     if user_id not in active_streams:
@@ -150,7 +156,22 @@ async def websocket_stream(websocket: WebSocket):
         transcription = transcribe_audio(converted_path)
         logger.info(f"WebSocket transcription: {transcription}")
 
-        # Retrieve context and generate LLM response
+        # Persist the transcript as a Chat row and schedule indexing
+        try:
+            with SessionLocal() as s:
+                chat = Chat(user_id=user_id, message=transcription, response=None, timestamp=datetime.utcnow())
+                s.add(chat)
+                s.commit()
+                s.refresh(chat)
+                # schedule background indexing
+                try:
+                    index_transcript(user_id, transcription, chat.id)
+                except Exception:
+                    logger.exception("Background indexing (websocket) failed; continuing")
+        except Exception:
+            logger.exception("Failed to persist chat from websocket stream")
+
+        # Retrieve context and generate LLM response using canonical db id
         context = retrieve_context(transcription, user_id)
         response_text = generate_response(transcription, context)
 

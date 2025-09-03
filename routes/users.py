@@ -3,8 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from db.database import get_db, User
+from db.database import get_or_create_user_by_external_id
 
 router = APIRouter()
+
+
+@router.get("/resolve/{external_id}")
+async def resolve_user(external_id: str, db: Session = Depends(get_db)):
+    """Return the DB primary key for a frontend/external user id (create if missing).
+
+    Useful for debugging and to allow the frontend to obtain the server-side canonical id.
+    """
+    db_id = get_or_create_user_by_external_id(db, external_id)
+    return {"external_id": external_id, "db_id": db_id}
 
 class UserCreate(BaseModel):
     user_id: str
