@@ -4,16 +4,16 @@ import urllib.parse
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, BackgroundTasks
 import json
 from sqlalchemy.orm import Session
 
 from config import settings
-from db.database import Chat, User, get_db
+from db.database import Chat, User, get_db, get_or_create_user_by_external_id
 from logger_config import logger
 from models.schemas import ChatResponse
 from services.llm import generate_response
-from services.pinecone_service import retrieve_context
+from services.pinecone_service import retrieve_context, index_transcript
 from services.stt import transcribe_audio
 from services.tts import generate_speech
 from services.streaming import websocket_stream
@@ -28,6 +28,7 @@ async def upload_voice(
     file: UploadFile = File(...),
     user_id: str = Form(...),
     generate_audio: bool = Form(False),
+    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
     logger.info(f"Voice upload requested by user {user_id}, generate_audio: {generate_audio}")
@@ -71,41 +72,52 @@ async def upload_voice(
         raise HTTPException(status_code=500, detail="Transcription failed")
 
     # Get or create user
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user:
-        logger.info(f"Creating new user with ID: {user_id}")
-        user = User(user_id=user_id)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    db_user_id = get_or_create_user_by_external_id(db, user_id)
+    logger.info(f"Resolved external user_id={user_id} to db_id={db_user_id}")
 
-    # Retrieve context using numeric user.id
-    logger.info(f"Retrieving context for user in voice.py--> {user.user_id} (db id={user.id})")
-    # Safely get numeric DB id (avoid passing SQLAlchemy Column objects)
-    # uid = getattr(user, 'id', 0) or 0
-    uid = user.user_id
-    try:
-        uid = int(uid)
-    except Exception:
-        uid = 0
-    context = retrieve_context(transcription, uid)
-    print("Final output context in voice.py --------> ", context)
-
-    # Generate LLM response
-    logger.info("Generating LLM response  - before function execution in - voice.py")
-    response_text = generate_response(transcription, context)
-
-    # Store chat in DB
+    # Store transcript immediately in DB as a Chat entry (response will be filled later)
     chat_entry = Chat(
-        user_id=user.id,
+        user_id=db_user_id,
         message=transcription,
-        response=response_text,
+        response=None,
         timestamp=datetime.utcnow()
     )
     db.add(chat_entry)
     db.commit()
     db.refresh(chat_entry)
-    logger.info(f"Chat entry saved with ID: {chat_entry.id}")
+    logger.info(f"Stored transcript as chat id={chat_entry.id} for user db_id={db_user_id}")
+
+    # Schedule background indexing of the transcript (so embeddings are created asynchronously)
+    try:
+        if background_tasks is not None:
+            background_tasks.add_task(index_transcript, db_user_id, transcription, chat_entry.id)
+            logger.info("Scheduled background indexing task for chat id=%s", chat_entry.id)
+        else:
+            # if BackgroundTasks wasn't provided, try to index inline (best-effort)
+            index_transcript(db_user_id, transcription, chat_entry.id)
+            logger.info("Indexed transcript inline for chat id=%s", chat_entry.id)
+    except Exception as e:
+        logger.error(f"Failed to schedule/index transcript: {e}")
+
+    # Retrieve context using canonical DB id
+    context = retrieve_context(transcription, db_user_id)
+    print("Final output context in voice.py --------> ", context)
+
+    # Generate LLM response
+    logger.info("Generating LLM response  - before function execution in - voice.py")
+    response_text = generate_response(transcription, context)
+    print("response_text---> ", response_text)
+
+    # Update existing chat entry with response
+    try:
+        chat_entry.response = response_text
+        chat_entry.timestamp = datetime.utcnow()
+        db.add(chat_entry)
+        db.commit()
+        db.refresh(chat_entry)
+        logger.info(f"Updated chat entry id={chat_entry.id} with response")
+    except Exception:
+        logger.exception("Failed to update chat_entry with response")
 
     # Generate audio response if requested
     audio_url = None
